@@ -1,131 +1,130 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Mic, X, Volume2 } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { AudioVisualizer } from "@/components/audio-visualizer"
-import { DataExhibitSlideover } from "@/components/data-exhibit-slideover"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Mic, X, Volume2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AudioVisualizer } from "@/components/audio-visualizer";
+import { DataExhibitSlideover } from "@/components/data-exhibit-slideover";
+import { createClient } from "@/lib/supabase/client";
 
-interface Message {
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: any;
+    SpeechRecognition?: any;
+  }
+}
+
+type Role = "user" | "assistant";
+
+interface ChatMessage {
+  role: Role;
+  content: string;
+  timestamp: Date;
 }
 
 interface VoiceInterviewClientProps {
   caseData: {
-    id: string
-    title: string
-    description: string
-    prompt: string
-    industry: string
-    difficulty: string
-  }
-  interviewId: string
-  userId: string
+    id: string;
+    title: string;
+    description: string;
+    prompt: string;
+    industry: string;
+    difficulty: string;
+  };
+  interviewId: string;
+  userId: string;
 }
 
 export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInterviewClientProps) {
-  const [isListening, setIsListening] = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [interimTranscript, setInterimTranscript] = useState("")
-  const [hasStarted, setHasStarted] = useState(false)
-  const [currentAIText, setCurrentAIText] = useState("")
-  const [displayedAIText, setDisplayedAIText] = useState("")
-  const recognitionRef = useRef<any>(null)
-  const synthRef = useRef<SpeechSynthesis | null>(null)
-  const router = useRouter()
-  const supabase = createClient()
-  const startTimeRef = useRef<Date>(new Date())
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [hasStarted, setHasStarted] = useState(false);
+  const [currentAIText, setCurrentAIText] = useState("");
+  const [displayedAIText, setDisplayedAIText] = useState("");
+  const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+
+  const ELEVEN_DEFAULT_VOICE = useRef<string>("pNInz6obpgDQGcFmaJgB"); // Adam
+
+  const router = useRouter();
+  const supabase = createClient();
+  const startTimeRef = useRef<Date>(new Date());
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      synthRef.current = window.speechSynthesis
+    if (typeof window === "undefined") return;
 
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
-        recognitionRef.current.continuous = true
-        recognitionRef.current.interimResults = true
-        recognitionRef.current.lang = "en-US"
+    synthRef.current = window.speechSynthesis;
 
-        recognitionRef.current.onresult = (event: any) => {
-          let interim = ""
-          let final = ""
+    const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (SR) {
+      const r = new SR();
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = "en-US";
 
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript
-            if (event.results[i].isFinal) {
-              final += transcript
-            } else {
-              interim += transcript
-            }
-          }
-
-          if (final) {
-            const userMessage: Message = {
-              role: "user",
-              content: final,
-              timestamp: new Date(),
-            }
-            setMessages((prev) => [...prev, userMessage])
-            setInterimTranscript("")
-            handleAIResponse(final)
-          } else {
-            setInterimTranscript(interim)
-          }
+      r.onresult = (event: any) => {
+        let interim = "";
+        let final = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) final += t;
+          else interim += t;
         }
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error("[v0] Speech recognition error:", event.error)
-          setIsListening(false)
+        if (final) {
+          const userMessage: ChatMessage = { role: "user", content: final, timestamp: new Date() };
+          setMessages((prev) => [...prev, userMessage]);
+          setInterimTranscript("");
+          handleAIResponse(final);
+        } else {
+          setInterimTranscript(interim);
         }
+      };
 
-        recognitionRef.current.onend = () => {
-          if (isListening) {
-            recognitionRef.current?.start()
-          }
-        }
-      }
+      r.onerror = (e: any) => {
+        console.error("[CaserAI] Speech recognition error:", e?.error);
+        setIsListening(false);
+      };
+
+      r.onend = () => {
+        if (isListening) r.start();
+      };
+
+      recognitionRef.current = r;
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
+      recognitionRef.current?.stop();
+      synthRef.current?.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
       }
-      if (synthRef.current) {
-        synthRef.current.cancel()
-      }
-    }
-  }, [isListening])
+    };
+  }, [isListening]);
 
   useEffect(() => {
     if (!currentAIText) {
-      setDisplayedAIText("")
-      return
+      setDisplayedAIText("");
+      return;
     }
-
-    let index = 0
-    setDisplayedAIText("")
-
-    const interval = setInterval(() => {
-      if (index < currentAIText.length) {
-        setDisplayedAIText(currentAIText.slice(0, index + 1))
-        index++
-      } else {
-        clearInterval(interval)
-      }
-    }, 30) // Adjust speed of typewriter effect
-
-    return () => clearInterval(interval)
-  }, [currentAIText])
+    let i = 0;
+    setDisplayedAIText("");
+    const id = setInterval(() => {
+      if (i < currentAIText.length) {
+        setDisplayedAIText(currentAIText.slice(0, i + 1));
+        i++;
+      } else clearInterval(id);
+    }, 30);
+    return () => clearInterval(id);
+  }, [currentAIText]);
 
   const handleAIResponse = async (userInput: string) => {
     try {
-      const response = await fetch("/api/interview/chat", {
+      const res = await fetch("/api/interview/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -133,74 +132,105 @@ export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInt
           caseContext: caseData,
           interviewId,
         }),
-      })
+      });
+      const data = await res.json();
+      const aiMessage: ChatMessage = { role: "assistant", content: data.message, timestamp: new Date() };
+      setMessages((prev) => [...prev, aiMessage]);
+      setCurrentAIText(data.message);
+      await speakText(data.message);
+    } catch (e) {
+      console.error("[CaserAI] AI response error:", e);
+    }
+  };
 
-      const data = await response.json()
-      const aiMessage: Message = {
-        role: "assistant",
-        content: data.message,
-        timestamp: new Date(),
+  const speakText = async (text: string) => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+    setIsSpeaking(true);
+
+    try {
+      const r = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voice_id: ELEVEN_DEFAULT_VOICE.current,
+          model_id: "eleven_turbo_v2",
+        }),
+      });
+
+      const ct = r.headers.get("content-type") || "";
+      if (r.ok && ct.includes("audio")) {
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        if (!audioRef.current) audioRef.current = new Audio();
+        audioRef.current.src = url;
+        audioRef.current.onended = () => {
+          setIsSpeaking(false);
+          setCurrentAIText("");
+        };
+        await audioRef.current.play();
+        return;
       }
 
-      setMessages((prev) => [...prev, aiMessage])
-      setCurrentAIText(data.message)
-      speakText(data.message)
-    } catch (error) {
-      console.error("[v0] Error getting AI response:", error)
+      console.warn("[CaserAI] TTS not audio:", await r.text());
+      playLocal(text);
+    } catch (e) {
+      console.error("[CaserAI] TTS fetch failed:", e);
+      playLocal(text);
     }
-  }
+  };
 
-  const speakText = (text: string) => {
-    if (synthRef.current) {
-      synthRef.current.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.95
-      utterance.pitch = 1
-      utterance.volume = 1
-
-      utterance.onstart = () => setIsSpeaking(true)
-      utterance.onend = () => {
-        setIsSpeaking(false)
-        setCurrentAIText("")
-      }
-
-      synthRef.current.speak(utterance)
+  const playLocal = (text: string) => {
+    if (!synthRef.current) {
+      setIsSpeaking(false);
+      return;
     }
-  }
+    synthRef.current.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = 0.95;
+    u.pitch = 1;
+    u.onend = () => {
+      setIsSpeaking(false);
+      setCurrentAIText("");
+    };
+    synthRef.current.speak(u);
+  };
 
   const startInterview = () => {
-    setHasStarted(true)
-    const welcomeMessage: Message = {
-      role: "assistant",
-      content: caseData.prompt,
-      timestamp: new Date(),
-    }
-    setMessages([welcomeMessage])
-    setCurrentAIText(caseData.prompt)
-    speakText(caseData.prompt)
-    startTimeRef.current = new Date()
-  }
+    setHasStarted(true);
+    const welcome: ChatMessage = { role: "assistant", content: caseData.prompt, timestamp: new Date() };
+    setMessages([welcome]);
+    setCurrentAIText(caseData.prompt);
+    speakText(caseData.prompt);
+    startTimeRef.current = new Date();
+  };
 
   const toggleListening = () => {
     if (!hasStarted) {
-      startInterview()
-      return
+      startInterview();
+      return;
     }
-
+    if (isSpeaking) return;
     if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
+      recognitionRef.current?.stop();
+      setIsListening(false);
     } else {
-      recognitionRef.current?.start()
-      setIsListening(true)
+      recognitionRef.current?.start?.();
+      setIsListening(true);
     }
-  }
+  };
 
   const endInterview = async () => {
-    recognitionRef.current?.stop()
-    synthRef.current?.cancel()
+    recognitionRef.current?.stop();
+    synthRef.current?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
 
-    const duration = Math.floor((new Date().getTime() - startTimeRef.current.getTime()) / 1000)
+    const duration = Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000);
 
     if (!interviewId.startsWith("demo-")) {
       await supabase
@@ -211,17 +241,17 @@ export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInt
           duration,
           transcript: messages,
         })
-        .eq("id", interviewId)
+        .eq("id", interviewId);
 
       await fetch("/api/interview/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ interviewId }),
-      })
+      });
     }
 
-    router.push(`/interview/${interviewId}/feedback`)
-  }
+    router.push(`/interview/${interviewId}/feedback`);
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -252,7 +282,7 @@ export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInt
             <>
               <div className="text-center">
                 <p className="text-lg font-medium text-muted-foreground">
-                  {isListening ? "Listening..." : isSpeaking ? "Connecting..." : "Ready"}
+                  {isListening ? "Listening..." : isSpeaking ? "Speaking..." : "Ready"}
                 </p>
               </div>
 
@@ -280,7 +310,15 @@ export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInt
                 size="lg"
                 variant="ghost"
                 className="h-16 w-16 rounded-full bg-muted hover:bg-muted/80"
-                onClick={() => synthRef.current?.cancel()}
+                onClick={() => {
+                  if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = audioRef.current.duration;
+                  }
+                  synthRef.current?.cancel();
+                  setIsSpeaking(false);
+                  setCurrentAIText("");
+                }}
                 disabled={!isSpeaking}
               >
                 <Volume2 className="h-6 w-6" />
@@ -316,21 +354,13 @@ export function VoiceInterviewClient({ caseData, interviewId, userId }: VoiceInt
           </div>
         </div>
       </main>
+
+      <audio ref={audioRef} className="hidden" />
     </div>
-  )
+  );
 }
 
 const sampleExhibits = [
-  {
-    id: "1",
-    title: "Market Size Analysis",
-    type: "chart" as const,
-    data: {},
-  },
-  {
-    id: "2",
-    title: "Revenue Breakdown",
-    type: "table" as const,
-    data: {},
-  },
-]
+  { id: "1", title: "Market Size Analysis", type: "chart" as const, data: {} },
+  { id: "2", title: "Revenue Breakdown", type: "table" as const, data: {} },
+];
