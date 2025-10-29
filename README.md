@@ -1,7 +1,7 @@
 # CaserAI - AI Coach for Consulting Interviews
 
-**About (1–2 sentences)**  
-CaserAI is a **Next.js + TypeScript** starter focused on **consulting case interviews**. It gives you an AI interviewer, MECE frameworks, market-sizing calculators, and a structured scoring rubric—so you can spin up a realistic practice tool in hours, not weeks.
+**About (1-2 sentences)**  
+CaserAI is a **Next.js + TypeScript** starter focused on **consulting case interviews**. It gives you an AI interviewer, MECE frameworks, market-sizing calculators, and a structured scoring rubric so you can spin up a realistic practice tool in hours, not weeks.
 
 **Imagine**  
 You open a page, choose “Profitability” or “Market Entry,” and an AI interviewer leads you through a candidate-led or interviewer-led case, probes your assumptions, checks your math, times your synthesis, and returns targeted feedback with next steps.
@@ -182,13 +182,13 @@ A national retailer with declining margins…
 
 ## Security
 • Do not commit secrets. Keep API keys in .env.local
-• Call LLMs from server-side routes; avoid exposing keys in the browser
-• Redact exported transcripts if they contain sensitive info
+<br>• Call LLMs from server-side routes; avoid exposing keys in the browser
+<br>• Redact exported transcripts if they contain sensitive info
 
 
 ## Roadmap
 [ ] Exhibit viewer with annotations & calculator overlay
-[ ] Voice mode (STT/TTS) with interruption handling
-[ ] Whiteboard + sticky notes for frameworks
-[ ] CSV/JSON export of transcripts, scores, deltas
-[ ] Practice plans & spaced repetition across case packs
+<br>[ ] Voice mode (STT/TTS) with interruption handling
+<br>[ ] Whiteboard + sticky notes for frameworks
+<br>[ ] CSV/JSON export of transcripts, scores, deltas
+<br>[ ] Practice plans & spaced repetition across case packs
