@@ -67,3 +67,128 @@ CaserAI/
 ├─ postcss.config.mjs
 ├─ tsconfig.json
 └─ README.md
+
+## Quick Start
+```bash
+# 1) Clone
+git clone https://github.com/VolodymyrLinuxovich/CaserAI.git
+cd CaserAI
+
+# 2) Install
+pnpm i
+# or: npm i
+
+# 3) Dev
+pnpm dev
+# or: npm run dev
+
+# 4) Build / Start
+pnpm build && pnpm start
+# or: npm run build && npm start
+```
+
+### Minimal `.env.local`
+```bash
+# provider(s)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-...
+
+# app
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+RAG_INDEX_DIR=public/cases
+```
+
+## Core Pieces
+
+### AI Interviewer (route handler)
+```ts
+// app/api/case/next/route.ts
+import { NextRequest } from "next/server";
+import { askLLM } from "@/lib/ai";
+import { buildPrompt } from "@/lib/prompts";
+import { scoreTurn } from "@/lib/rubric";
+
+export async function POST(req: NextRequest) {
+  const { mode, history, rubric, caseId } = await req.json();
+
+  // Optional: pull case context (RAG) from /public/cases
+  // const ctx = await retrieveCaseSnippets(caseId, history);
+
+  const prompt = buildPrompt({ mode, history /*, ctx */ });
+  const reply = await askLLM(prompt, { stream: false });
+
+  const turnScore = scoreTurn({ reply, rubric });
+  return Response.json({ reply, turnScore });
+}
+```
+
+### Rubric (dimensions & weights)
+```ts
+// lib/rubric.ts
+export type Rubric = {
+  structure: number;     // MECE, roadmap, hypotheses
+  quant: number;         // math, units, checks
+  assumptions: number;   // realism, defensibility
+  synthesis: number;     // insights, recommendation, risks, next steps
+  communication: number; // clarity, pace, listening
+};
+
+export const defaultWeights: Rubric = {
+  structure: 0.25,
+  quant: 0.25,
+  assumptions: 0.20,
+  synthesis: 0.20,
+  communication: 0.10,
+};
+```
+
+### Math helpers
+```ts
+// lib/math.ts
+export const breakevenQty = (fixed: number, price: number, varCost: number) =>
+  fixed / Math.max(1e-9, price - varCost);
+
+export const cagr = (start: number, end: number, years: number) =>
+  Math.pow(end / Math.max(1e-9, start), 1 / Math.max(1, years)) - 1;
+```
+
+### Case file format (Markdown/YAML)
+id: "profitability-retail-001"
+type: "profitability"
+difficulty: "medium"
+industry: "retail"
+exhibits:
+  - path: "exhibits/pnl.png"
+learning_goals:
+  - "Lay out a clean profitability tree"
+  - "Run breakeven and sensitivity"
+
+# Client
+A national retailer with declining margins…
+
+## Data
+- Average ticket, traffic, gross margin %
+- Fixed vs variable costs
+- Recent price changes and promo cadence
+
+
+## Typical Flows
+1) Candidate-led:
+   Intro → Clarify objective → Framework outline → Drive analyses → Synthesis
+
+2) Interviewer-led:
+   Short prompts → Targeted exhibits → Calculation checks → Final recommendation
+
+
+## Security
+• Do not commit secrets. Keep API keys in .env.local
+• Call LLMs from server-side routes; avoid exposing keys in the browser
+• Redact exported transcripts if they contain sensitive info
+
+
+## Roadmap
+[ ] Exhibit viewer with annotations & calculator overlay
+[ ] Voice mode (STT/TTS) with interruption handling
+[ ] Whiteboard + sticky notes for frameworks
+[ ] CSV/JSON export of transcripts, scores, deltas
+[ ] Practice plans & spaced repetition across case packs
