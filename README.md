@@ -1,4 +1,4 @@
-# CaserAI — AI Coach for Consulting Interviews
+# CaserAI - AI Coach for Consulting Interviews
 
 **About (1–2 sentences)**  
 CaserAI is a **Next.js + TypeScript** starter focused on **consulting case interviews**. It gives you an AI interviewer, MECE frameworks, market-sizing calculators, and a structured scoring rubric—so you can spin up a realistic practice tool in hours, not weeks.
@@ -6,7 +6,6 @@ CaserAI is a **Next.js + TypeScript** starter focused on **consulting case inter
 **Imagine**  
 You open a page, choose “Profitability” or “Market Entry,” and an AI interviewer leads you through a candidate-led or interviewer-led case, probes your assumptions, checks your math, times your synthesis, and returns targeted feedback with next steps.
 
----
 
 ## What CaserAI Does
 - **AI Interviewer Modes**: interviewer-led and candidate-led; switch mid-session.  
@@ -18,7 +17,6 @@ You open a page, choose “Profitability” or “Market Entry,” and an AI int
 - **Content Packs**: plug in your own cases as Markdown/YAML and retrieve them via RAG.  
 - **(Optional) Audio**: STT for live conversation; TTS for voice interviewer.
 
----
 
 ## Tech Stack
 - **App**: Next.js (App Router) + TypeScript, React Server Components.
@@ -27,8 +25,6 @@ You open a page, choose “Profitability” or “Market Entry,” and an AI int
 - **AI**: OpenAI/Anthropic (pluggable provider), retrieval over local case files.
 - **APIs**: Route Handlers under `app/api/*` (REST), stream support.
 - **Build**: pnpm / npm; PostCSS; ESLint/Prettier.
-
----
 
 ## Repository Layout
 ```text
